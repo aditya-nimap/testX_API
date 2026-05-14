@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    { "source": "/auth/x",                    "destination": "/api/auth-start" },
+    { "source": "/auth/x/callback",           "destination": "/api/auth-callback" },
+    { "source": "/api/tweet",                 "destination": "/api/tweet" },
+    { "source": "/api/status",                "destination": "/api/status" },
+    { "source": "/auth/linkedin",             "destination": "/api/linkedin/auth-start" },
+    { "source": "/auth/linkedin/callback",    "destination": "/api/linkedin/auth-callback" },
+    { "source": "/api/linkedin/post",         "destination": "/api/linkedin/post" },
+    { "source": "/api/linkedin/status",       "destination": "/api/linkedin/status" },
+    { "source": "/linkedin.html",             "destination": "/public/linkedin.html" },
+    { "source": "/",                          "destination": "/public/index.html" }
+  ]
+}
