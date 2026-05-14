@@ -1,9 +1,0 @@
-{
-  "name": "x-oauth-vercel",
-  "version": "1.0.0",
-  "description": "X OAuth 1.0a — post tweets on behalf of users",
-  "dependencies": {
-    "oauth": "^0.10.0",
-    "cookie": "^0.6.0"
-  }
-}
