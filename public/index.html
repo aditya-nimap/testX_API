@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XConnect — Post Tweets via OAuth</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c10;
+    --surface: #0f1318;
+    --surface2: #141920;
+    --border: #1c2128;
+    --border-light: #252d38;
+    --blue: #1d9bf0;
+    --blue-dim: rgba(29,155,240,0.12);
+    --white: #e7e9ea;
+    --muted: #536471;
+    --muted2: #8b98a5;
+    --green: #00ba7c;
+    --green-dim: rgba(0,186,124,0.1);
+    --orange: #ff6b35;
+    --red: #f4212e;
+    --font: 'Syne', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: var(--font);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 16px 80px;
+  }
+
+  /* Subtle dot grid */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image: radial-gradient(circle, rgba(29,155,240,0.06) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events:none;
+  }
+  /* Top glow */
+  body::after {
+    content:'';
+    position:fixed; top:-200px; left:50%; transform:translateX(-50%);
+    width: 600px; height: 400px;
+    background: radial-gradient(ellipse, rgba(29,155,240,0.08) 0%, transparent 70%);
+    pointer-events:none;
+  }
+
+  .wrap {
+    width: 100%; max-width: 560px;
+    position: relative; z-index: 1;
+  }
+
+  /* ── Logo ── */
+  .logo-row {
+    display:flex; align-items:center; gap:14px;
+    margin-bottom: 40px;
+    animation: up 0.5s ease both;
+  }
+  .logo-icon {
+    width:44px; height:44px;
+    background: var(--blue);
+    border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; font-weight:800; color:#fff;
+    box-shadow: 0 0 24px rgba(29,155,240,0.4);
+  }
+  .logo-text h1 { font-size:20px; font-weight:800; letter-spacing:-0.5px; }
+  .logo-text p  { font-size:12px; color:var(--muted2); font-family:var(--mono); margin-top:2px; }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius:16px;
+    padding: 28px;
+    margin-bottom: 16px;
+    animation: up 0.5s ease both;
+  }
+  .card:nth-child(2){ animation-delay:.06s }
+  .card:nth-child(3){ animation-delay:.12s }
+  .card:nth-child(4){ animation-delay:.18s }
+
+  .card-title {
+    font-size:13px; font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    color:var(--muted2);
+    margin-bottom:18px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .card-title .dot {
+    width:6px; height:6px; border-radius:50%;
+    background: var(--blue);
+  }
+
+  /* ── Status pill ── */
+  .status-pill {
+    display:inline-flex; align-items:center; gap:7px;
+    padding:6px 14px; border-radius:20px;
+    font-size:13px; font-weight:600; font-family:var(--mono);
+    transition: all .3s;
+  }
+  .status-pill.disconnected {
+    background: rgba(83,100,113,0.15);
+    border:1px solid var(--border-light);
+    color:var(--muted2);
+  }
+  .status-pill.connected {
+    background: var(--green-dim);
+    border:1px solid rgba(0,186,124,0.3);
+    color:var(--green);
+  }
+  .status-pill .pulse {
+    width:7px; height:7px; border-radius:50%;
+    background:currentColor;
+    animation: pulse 2s infinite;
+  }
+
+  /* ── Connect button ── */
+  .btn-connect {
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%;
+    background: var(--blue);
+    color:#fff;
+    font-family:var(--font);
+    font-size:15px; font-weight:700;
+    padding:15px;
+    border-radius:50px;
+    border:none; cursor:pointer;
+    text-decoration:none;
+    margin-top:18px;
+    transition: all .2s;
+    box-shadow: 0 4px 24px rgba(29,155,240,0.35);
+    position:relative; overflow:hidden;
+  }
+  .btn-connect::before {
+    content:'';
+    position:absolute; inset:0;
+    background:linear-gradient(135deg,rgba(255,255,255,0.1),transparent);
+  }
+  .btn-connect:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(29,155,240,0.45); }
+  .btn-connect:active { transform:translateY(0); }
+  .btn-connect svg { width:18px; height:18px; fill:#fff; flex-shrink:0; }
+
+  .btn-disconnect {
+    display:flex; align-items:center; justify-content:center;
+    width:100%; margin-top:12px;
+    background:none; color:var(--muted2);
+    font-family:var(--mono); font-size:12px;
+    border:1px solid var(--border-light);
+    border-radius:50px; padding:10px;
+    cursor:pointer; transition:all .2s;
+  }
+  .btn-disconnect:hover { border-color:var(--red); color:var(--red); }
+
+  .user-badge {
+    display:flex; align-items:center; gap:12px;
+    background:var(--surface2);
+    border:1px solid var(--border-light);
+    border-radius:12px;
+    padding:14px 18px;
+    margin-top:16px;
+  }
+  .user-avatar {
+    width:38px; height:38px; border-radius:50%;
+    background:var(--blue-dim);
+    border:2px solid rgba(29,155,240,0.3);
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px;
+  }
+  .user-name { font-size:15px; font-weight:700; }
+  .user-handle { font-size:12px; color:var(--muted2); font-family:var(--mono); }
+
+  /* ── Tweet composer ── */
+  .composer {
+    background:var(--surface2);
+    border:1px solid var(--border-light);
+    border-radius:12px;
+    padding:16px;
+    transition: border-color .2s;
+  }
+  .composer:focus-within { border-color: var(--blue); }
+
+  textarea {
+    width:100%; background:none; border:none; outline:none;
+    color:var(--white); font-family:var(--font); font-size:16px;
+    line-height:1.5; resize:none; min-height:90px;
+    placeholder-color:var(--muted);
+  }
+  textarea::placeholder { color:var(--muted); }
+
+  .composer-footer {
+    display:flex; align-items:center; justify-content:space-between;
+    padding-top:12px;
+    border-top:1px solid var(--border);
+    margin-top:12px;
+  }
+
+  .char-ring {
+    position:relative; width:28px; height:28px;
+  }
+  .char-ring svg { transform:rotate(-90deg); }
+  .char-ring circle { fill:none; stroke-width:3; }
+  .char-ring .bg { stroke:var(--border-light); }
+  .char-ring .fg { stroke:var(--blue); stroke-linecap:round; transition:stroke-dashoffset .15s, stroke .15s; }
+  .char-count-label {
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:8px; font-family:var(--mono); color:var(--muted2);
+  }
+
+  .btn-post {
+    background:var(--blue); color:#fff;
+    font-family:var(--font); font-size:14px; font-weight:700;
+    padding:9px 22px; border-radius:50px;
+    border:none; cursor:pointer; transition:all .2s;
+  }
+  .btn-post:hover:not(:disabled) { background:#1a8cd8; }
+  .btn-post:disabled { opacity:.4; cursor:not-allowed; }
+
+  /* ── Response ── */
+  .response {
+    border-radius:10px;
+    padding:14px 16px;
+    font-family:var(--mono);
+    font-size:12px;
+    line-height:1.6;
+    margin-top:12px;
+    display:none;
+  }
+  .response.show { display:block; }
+  .response.success { background:var(--green-dim); border:1px solid rgba(0,186,124,0.25); color:var(--green); }
+  .response.error   { background:rgba(244,33,46,0.08); border:1px solid rgba(244,33,46,0.25); color:#ff6b6b; }
+
+  /* ── Flow steps ── */
+  .steps { display:flex; flex-direction:column; gap:0; }
+  .step { display:flex; gap:16px; }
+  .step-left { display:flex; flex-direction:column; align-items:center; flex-shrink:0; }
+  .step-num {
+    width:30px; height:30px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; flex-shrink:0;
+  }
+  .n1 { background:rgba(29,155,240,0.15); color:var(--blue); border:1px solid rgba(29,155,240,0.3); }
+  .n2 { background:rgba(0,186,124,0.15); color:var(--green); border:1px solid rgba(0,186,124,0.3); }
+  .n3 { background:rgba(255,107,53,0.15); color:var(--orange); border:1px solid rgba(255,107,53,0.3); }
+  .n4 { background:rgba(139,92,246,0.15); color:#a78bfa; border:1px solid rgba(139,92,246,0.3); }
+  .n5 { background:rgba(0,186,124,0.15); color:var(--green); border:1px solid rgba(0,186,124,0.3); }
+  .step-line { width:1px; flex:1; background:var(--border); min-height:24px; }
+  .step-body { padding-bottom:24px; padding-top:4px; flex:1; }
+  .step:last-child .step-body { padding-bottom:0; }
+  .step-title { font-size:14px; font-weight:700; margin-bottom:4px; }
+  .step-desc  { font-size:12px; color:var(--muted2); line-height:1.6; font-family:var(--mono); }
+  .step-desc code { color:var(--blue); background:var(--blue-dim); padding:1px 5px; border-radius:4px; }
+
+  /* ── .env block ── */
+  .env-block {
+    background:#0d1117;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:16px;
+    font-family:var(--mono);
+    font-size:12px;
+    line-height:2;
+    position:relative;
+  }
+  .env-key { color:var(--blue); }
+  .env-val { color:#a78bfa; }
+  .env-comment { color:var(--muted); }
+  .copy-block {
+    position:absolute; top:10px; right:10px;
+    background:var(--border-light); color:var(--muted2);
+    border:none; border-radius:6px; padding:4px 10px;
+    font-family:var(--mono); font-size:11px; cursor:pointer;
+    transition:all .2s;
+  }
+  .copy-block:hover { color:var(--blue); }
+  .copy-block.ok { color:var(--green); }
+
+  /* ── Deploy steps ── */
+  .deploy-list {
+    list-style:none;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .deploy-list li {
+    display:flex; gap:12px; align-items:flex-start;
+    font-size:13px; color:var(--muted2);
+    font-family:var(--mono);
+    line-height:1.6;
+  }
+  .deploy-list .n {
+    flex-shrink:0;
+    width:20px; height:20px; border-radius:50%;
+    background:var(--blue-dim);
+    color:var(--blue);
+    font-size:10px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    margin-top:1px;
+  }
+  .deploy-list code { color:var(--white); background:var(--surface2); padding:1px 5px; border-radius:4px; }
+
+  /* ── Animations ── */
+  @keyframes up {
+    from { opacity:0; transform:translateY(16px); }
+    to   { opacity:1; transform:translateY(0);    }
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:.5; transform:scale(0.8); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Logo -->
+  <div class="logo-row">
+    <div class="logo-icon">𝕏</div>
+    <div class="logo-text">
+      <h1>XConnect</h1>
+      <p>OAuth 1.0a · Post on behalf of users</p>
+    </div>
+  </div>
+
+  <!-- Card 1: Connect Account -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span> Account</div>
+
+    <div id="statusPill" class="status-pill disconnected">
+      <span class="pulse"></span>
+      <span id="statusText">Not connected</span>
+    </div>
+
+    <!-- Disconnected state -->
+    <div id="connectSection">
+      <a href="/auth/x" class="btn-connect">
+        <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.741l7.73-8.835L1.254 2.25H8.08l4.258 5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        Connect X Account
+      </a>
+    </div>
+
+    <!-- Connected state -->
+    <div id="connectedSection" style="display:none">
+      <div class="user-badge">
+        <div class="user-avatar">🐦</div>
+        <div>
+          <div class="user-name" id="userName">@username</div>
+          <div class="user-handle">Account linked ✓</div>
+        </div>
+      </div>
+      <button class="btn-disconnect" onclick="disconnect()">✕ Disconnect account</button>
+    </div>
+  </div>
+
+  <!-- Card 2: Tweet Composer -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span> Post a Tweet</div>
+
+    <div class="composer">
+      <textarea id="tweetText" placeholder="What's happening?" oninput="onType()" maxlength="280"></textarea>
+      <div class="composer-footer">
+        <div class="char-ring">
+          <svg width="28" height="28" viewBox="0 0 28 28">
+            <circle class="bg" cx="14" cy="14" r="11" />
+            <circle class="fg" id="charCircle" cx="14" cy="14" r="11"
+              stroke-dasharray="69.1" stroke-dashoffset="69.1"/>
+          </svg>
+          <div class="char-count-label" id="charLabel">0</div>
+        </div>
+        <button class="btn-post" id="postBtn" onclick="postTweet()" disabled>Post →</button>
+      </div>
+    </div>
+    <div class="response" id="responseBox"></div>
+  </div>
+
+  <!-- Card 3: OAuth Flow -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span> How the OAuth Flow Works</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-left"><div class="step-num n1">1</div><div class="step-line"></div></div>
+        <div class="step-body">
+          <div class="step-title">User clicks Connect</div>
+          <div class="step-desc">Frontend hits <code>/auth/x</code> → server calls X to get a request token → redirects user to <code>twitter.com/oauth/authorize</code></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-left"><div class="step-num n2">2</div><div class="step-line"></div></div>
+        <div class="step-body">
+          <div class="step-title">User approves on X.com</div>
+          <div class="step-desc">X shows your app name + requested permissions. User clicks <strong>Allow</strong>.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-left"><div class="step-num n3">3</div><div class="step-line"></div></div>
+        <div class="step-body">
+          <div class="step-title">X calls your Callback URL</div>
+          <div class="step-desc">X redirects to <code>/auth/x/callback?oauth_token=…&oauth_verifier=…</code></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-left"><div class="step-num n4">4</div><div class="step-line"></div></div>
+        <div class="step-body">
+          <div class="step-title">Server exchanges for Access Token</div>
+          <div class="step-desc">Your <code>api/auth-callback.js</code> trades the verifier for a permanent <code>access_token</code> + <code>access_token_secret</code> and saves them.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-left"><div class="step-num n5">5</div></div>
+        <div class="step-body">
+          <div class="step-title">Post tweets anytime</div>
+          <div class="step-desc"><code>POST /api/tweet</code> looks up the stored token and calls <code>api.twitter.com/2/tweets</code> on the user's behalf.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card 4: Deploy guide -->
+  <div class="card">
+    <div class="card-title"><span class="dot"></span> Environment Variables (Vercel Dashboard)</div>
+    <div class="env-block">
+      <button class="copy-block" onclick="copyEnv(this)">Copy</button>
+      <div><span class="env-comment"># From developer.x.com → Your App → Keys and Tokens</span></div>
+      <div><span class="env-key">X_API_KEY</span>=<span class="env-val">your_api_key_here</span></div>
+      <div><span class="env-key">X_API_SECRET</span>=<span class="env-val">your_api_secret_here</span></div>
+      <div><span class="env-comment"># Your Vercel URL + /auth/x/callback</span></div>
+      <div><span class="env-key">CALLBACK_URL</span>=<span class="env-val">https://your-app.vercel.app/auth/x/callback</span></div>
+    </div>
+
+    <div style="margin-top:20px; margin-bottom:12px; font-size:12px; color:var(--muted2); font-family:var(--mono);">Deploy steps:</div>
+    <ul class="deploy-list">
+      <li><span class="n">1</span><span>Push this folder to a GitHub repo</span></li>
+      <li><span class="n">2</span><span>Go to <code>vercel.com</code> → Import → select your repo</span></li>
+      <li><span class="n">3</span><span>Add the 3 env vars above in Vercel's <code>Settings → Environment Variables</code></span></li>
+      <li><span class="n">4</span><span>Copy your Vercel URL and paste <code>https://your-app.vercel.app/auth/x/callback</code> into X Developer Console → Callback URI</span></li>
+      <li><span class="n">5</span><span>Set App Permissions to <code>Read and Write</code> in the X Developer Portal</span></li>
+      <li><span class="n">6</span><span>Click Connect above and test!</span></li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+// ─── Check status on load ───────────────────────────────────────────────────
+async function checkStatus() {
+  // Check URL params first (after OAuth redirect)
+  const params = new URLSearchParams(location.search);
+  if (params.get('connected') === 'true') {
+    const user = params.get('user') || 'user';
+    setConnected(user);
+    history.replaceState({}, '', '/'); // clean URL
+    return;
+  }
+
+  // Check server
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    if (d.connected) setConnected(d.screenName);
+  } catch (e) { /* standalone demo mode */ }
+}
+
+function setConnected(screenName) {
+  document.getElementById('statusPill').className = 'status-pill connected';
+  document.getElementById('statusText').textContent = '@' + screenName + ' connected';
+  document.getElementById('connectSection').style.display = 'none';
+  document.getElementById('connectedSection').style.display = 'block';
+  document.getElementById('userName').textContent = '@' + screenName;
+  updatePostBtn();
+}
+
+function disconnect() {
+  document.cookie = 'x_user_id=; Max-Age=0; path=/';
+  document.cookie = 'x_screen_name=; Max-Age=0; path=/';
+  location.reload();
+}
+
+// ─── Tweet composer ─────────────────────────────────────────────────────────
+const CIRCUMFERENCE = 2 * Math.PI * 11; // r=11
+
+function onType() {
+  const len = document.getElementById('tweetText').value.length;
+  const pct = len / 280;
+  const circle = document.getElementById('charCircle');
+  const offset = CIRCUMFERENCE * (1 - pct);
+  circle.style.strokeDashoffset = offset;
+  circle.style.stroke = len > 260 ? '#ff6b35' : len > 240 ? '#ffd700' : '#1d9bf0';
+  document.getElementById('charLabel').textContent = len > 240 ? (280 - len) : '';
+  updatePostBtn();
+}
+
+function updatePostBtn() {
+  const len = document.getElementById('tweetText').value.trim().length;
+  const connected = document.getElementById('statusPill').classList.contains('connected');
+  document.getElementById('postBtn').disabled = len === 0 || len > 280 || !connected;
+}
+
+async function postTweet() {
+  const text = document.getElementById('tweetText').value.trim();
+  const btn = document.getElementById('postBtn');
+  const rb = document.getElementById('responseBox');
+
+  btn.textContent = 'Posting…';
+  btn.disabled = true;
+  rb.className = 'response';
+
+  try {
+    const r = await fetch('/api/tweet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const d = await r.json();
+
+    if (d.success) {
+      rb.className = 'response show success';
+      rb.textContent = '✓ Posted! Tweet ID: ' + d.tweet.id + '  (as @' + d.postedAs + ')';
+      document.getElementById('tweetText').value = '';
+      onType();
+    } else {
+      rb.className = 'response show error';
+      rb.textContent = '✗ ' + (d.error || 'Unknown error');
+    }
+  } catch (e) {
+    rb.className = 'response show error';
+    rb.textContent = '✗ Network error — is your server running?';
+  }
+
+  btn.textContent = 'Post →';
+  updatePostBtn();
+}
+
+function copyEnv(btn) {
+  const text = `X_API_KEY=your_api_key_here\nX_API_SECRET=your_api_secret_here\nCALLBACK_URL=https://your-app.vercel.app/auth/x/callback`;
+  navigator.clipboard.writeText(text);
+  btn.textContent = 'Copied!';
+  btn.classList.add('ok');
+  setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 2000);
+}
+
+checkStatus();
+</script>
+</body>
+</html>
