@@ -1,9 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/auth/x",          "destination": "/api/auth-start" },
-    { "source": "/auth/x/callback", "destination": "/api/auth-callback" },
-    { "source": "/api/tweet",       "destination": "/api/tweet" },
-    { "source": "/api/status",      "destination": "/api/status" },
-    { "source": "/(.*)",            "destination": "/public/$1" }
-  ]
-}
