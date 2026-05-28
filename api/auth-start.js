@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
     // (In production, store in a DB or Redis keyed by oauthToken)
     res.setHeader(
       "Set-Cookie",
-      `oauth_token_secret=${oauthTokenSecret}; HttpOnly; Path=/; Max-Age=600`
+      `oauth_token_secret=${oauthTokenSecret}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=600`
     );
 
     // Redirect user to X to approve your app
